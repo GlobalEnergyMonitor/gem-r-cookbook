@@ -1,0 +1,1366 @@
+---
+title: "GEM's R graphics cookbook"
+subtitle: "A resource for making high-quality data visualizations for Global Energy Monitor publications using the R programming language"
+author: "Global Energy Monitor"
+format:
+  html:
+    smooth-scroll: true
+    link-external-icon: true
+    link-external-newwindow: true
+    embed-resources: true
+theme: cosmo   
+toc: true
+toc-depth: 5
+toc-title: Contents
+---
+
+## How to create GEM style graphics in R
+
+At GEM, we have developed an R package and an R cookbook to make the process of creating graphics in our in-house style using R's ggplot2 library a more reproducible process, as well as making it easier for people new to R to create graphics. 
+
+The cookbook below should hopefully help anyone who wants to make graphics like these: 
+  
+
+![](images/gemplot_visuals_v4.png)
+
+We'll get to how you can put together the various elements of these graphics, but **let's get the admin out of the way first...**
+
+### Getting set up 
+
+#### Load all the libraries you need
+
+A few of the steps in this cookbook - and to create charts in R in general - require certain packages to be installed and loaded. So that you do not have to install and load them one by one, you can use the `p_load` function in the `pacman` package to load them all at once with the following code. 
+
+```{r message = FALSE}
+#This line of code installs the pacman page if you do not have it installed - if you do, it simply loads the package
+if(!require(pacman))install.packages("pacman")
+
+pacman::p_load('dplyr', 'tidyr', 'readxl',
+               'ggplot2', 'gemplot',
+               'forcats', 'R.utils', 'png', 
+               'grid', 'ggpubr', 'scales',
+               'treemapify', 'ggalt')
+```
+
+#### Install the gemplot package
+
+`gemplot` is not on CRAN, so you will have to install it directly from Github using `devtools`. 
+
+If you do not have the `devtools` package installed, you will have to run the first line in the code below as well. As the repository hosting the package is private, you will need to make sure you either have your Github Auth token in your Renviron file, or you can simply pass it as an argument (auth_token = "token") to the install_github() function below.
+
+``` {r eval = FALSE}
+# install.packages('devtools')
+devtools::install_github('GlobalEnergyMonitor/gemplot')
+```
+
+For more info on `gemplot` check out the [package's Github repo](https://github.com/GlobalEnergyMonitor/gemplot), but the key details about how to use the package and its functions are detailed below. 
+
+When you have downloaded the package and successfully installed it you are good to go and create charts. 
+
+### Working with the gemplot package
+
+The package has three functions, `gem_style()`, `add_gem_footer()` and `save_gem_plot()`.
+
+The key function to style plots is called `gem_style()`, the `add_gem_footer()` function adds the Global Energy Monitor footer and a source to the visualisation and the  `save_gem_plot()` helps saving out the plot at high resolution.
+
+Below is a basic explanation and summary of these functions:
+
+#### Style your chart
+
+1. `gem_style()`: This function is added to the ggplot chain after you have created a plot. What it does is generally makes text size, font and colour of text, text alignment, axis lines, axis text and many other standard chart components into a matching and specific style, so that you do not have to define each every time you make a plot. `gem_style()` has two arguments, one that sets the font and a second that defines the base font ratio - in most cases you don't have to set these and allow them to use the default.
+
+`Open Sans` is for now GEM's default font - see instructions below for how to download the font and load it into R in order to use it for creating gemplot charts. The base text ratio allows you to increase or decrease the font size across the graphic (except any geom_text or geom_label text sizes which are defined directly in that function). The multiples between the different texts is defined in gem_style (axis text, legend text, subtitle and title) so that won't change - but tweaking the base text ratio will change all of them, based on the multiples defined in the style. But overall, the base ratio should probably be left as the default, given that has undergone accessibility and readability testing, including how it scales on mobile screens - but if you do wish to change the text size for some reason, you shouldn't make a significant change - maybe change to 0.9 or 1.1 for example.  
+
+The function is pretty basic and does not change or adapt based on the type of chart you are making, so in some cases you will need to make additional `theme` arguments in your ggplot chain if you want to make any additions or changes to the style, for example to add or remove gridlines etc. 
+
+For now, the package does not set or use pre-defined colours for your plots and so do not come out of the box from the `gem_style` function, but need to be explicitly set in your other standard `ggplot` chart functions.
+
+Example of how it is used in a standard workflow:
+
+```
+line <- 
+ggplot(line_df, aes(x = year, y = lifeExp)) +
+geom_line(colour = "#007f7f", size = 1) +
+gem_style()
+```
+
+#### Save out your chart 
+
+2. `add_gem_footer()`: This function will add a footer to your plot that includes the GEM logo on the bottom right and an option to add a source text on the bottom left hand side. In order to accurately represent the ratio of plot height and footer, you need to add your plot height in pixels to the function. This function is different from the finalise_plot function from `bbplot` as it does not left-align the plot - given that now happens in the theme - and it does not save the plot, that needs to happen separately. The function has three arguments, one of which need to be explicitly set and two that are defaults unless you overwrite them (although not setting the source name will leave it empty).  
+
+Here are the function arguments:
+`add_gem_footer(plot_name, source_name = "", height_pixels = 560)`
+
+
+* `plot_name`: the variable name that you have called your plot, for example for the chart example above `plot_name` would be `"line"`    
+*  `source_name`: the source text that you want to appear at the bottom left corner of your plot. You will need to type the word `"Source:"`  before it, just the source, so for example `source = "Source: Global Energy Monitor"` would be the right way to do that. If you do not define this argument, by default it will leave it empty
+* `height_pixels`: this is set to 560px by default, so only call this argument and specify the height you want your chart to be. 
+
+
+Example of how the `add_gem_footer()` is used in a standard workflow. This function is called once you have created and finalised your chart data, titles and added the `gem_style()` to it (see above):
+
+```
+add_gem_footer(plot_name = my_line_plot,
+source = "Source: Global Energy Monitor",
+height_pixels = 550)
+```  
+
+3. `save_gem_plot()`: This function will save out your ggplot, allowing you to define where it will be saved, its dimensions and resolution. Most of the time, you will do this after having added the gem footer to your plot, but this isn't strictly necessary - the function just uses ggsave's defaults to export your plot and it doesn't need to have a footer to work. 
+
+Here are the function arguments:
+`save_gem_plot(plot_grid, save_filepath, width_pixels = 800, height_pixels = 560, resolution = 3)`
+
+* `plot_grid`: the variable name that you have called your plot grid, either a standard ggplot, or a plot grid with a footer added to it
+* `save_filepath`: the precise filepath that you want your graphic to save to, including the `.png` extension at the end. This does depend on your working directory and if you are in a specific R project. An example of a relative filepath would be: `/charts/line_chart.png`.  
+* `width_pixels`: this is set to 800px by default, so only call this argument and specify the width you want your chart to be. You probably should leave this as a default, especially if you are using a plot with the GEM footer attached to it - changing the width will impact the location of the GEM logo in the footer
+* `height_pixels`: this is set to 560px by default, so only call this argument and specify the height you want your chart to be
+* `resolution`: this is set to 3x resolution by default (3 * 100), but you can set it to a higher or lower resolution by setting the argument to be different (for example 2 if you want the resolution to be 2x or 4 for an even higher resolution plot and maximum sharpness)
+
+Example of how it used to save out a plot:
+```
+save_gem_plot(plot_grid = line_plot_with_gem_footer,
+save_filepath = "filename_that_my_plot_should_be_saved_to-nc.png",
+width_pixels = 800,
+height_pixels = 560,
+resolution = 3)
+```  
+
+#### Gemplot styling specification
+
+Click the chevron below to expand and see the full style attributes used in the `gem_style()` function from the `gemplot` R package for when creating graphics in.  
+
+```{r r_full_gem_style_details}
+#| code-fold: true
+#| eval: false
+#| code-summary: "Full style specs for R"
+
+gem_style <- function(font = "Open Sans", base_ratio = 1) {
+  base_size <- base_ratio * 16
+  title_colour <- "#222222"
+  text_colour <- "#525252"
+
+  ggplot2::theme(
+    plot.margin =  ggplot2::margin(6, 6, 6, 6),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    plot.title = ggtext::element_textbox_simple(
+      size = base_size * 1.5,
+      family= font,
+      face="bold",
+      vjust = 1,
+      lineheight = 1.35,
+      color = title_colour,
+      margin = ggplot2::margin(6, 6, 6, 6)
+    ),
+    plot.subtitle = ggtext::element_textbox_simple(
+      size = base_size * 1.15,
+      lineheight = 1.45,
+      family= font,
+      color= text_colour,
+      vjust = 0,
+      padding = ggplot2::margin(t = 12, b =12),
+      margin = ggplot2::margin(0, 6, 6, 6)
+    ),
+    #This sets the caption text element, in case we need it for additional
+    # info - the basic source is set in the add GEM signature
+    plot.caption = ggtext::element_textbox_simple(size = base_size * 0.875,
+                                                  lineheight = 1.2,
+                                                  family= font,
+                                                  color= text_colour,
+                                                  margin = ggplot2::margin(18, 6, 6, 6)),
+
+    #Legend format
+    #This sets the position and alignment of the legend, removes a title and
+    # backround for it and sets the requirements for any text within the
+    #  legend. The legend may often need some more manual tweaking when 
+    #  it comes to its exact position based on the plot coordinates.
+    legend.position = "top",
+    legend.text.align = 0,
+    legend.background = ggplot2::element_blank(),
+    legend.title = ggplot2::element_blank(),
+    legend.key = ggplot2::element_blank(),
+    legend.text = ggplot2::element_text(family=font,
+                                        size= base_size,
+                                        color= text_colour,
+                                        margin = margin(r = 6, l = 3)),
+
+    #Axis format
+    #This sets the text font, size and colour for the axis test, as well as
+    # setting the margins and removes lines and ticks. In some cases, axis
+    #  lines and axis ticks are things we would want to have in the chart -
+    #  the cookbook shows examples of how to do so.
+    axis.title = ggplot2::element_blank(),
+    axis.text = ggplot2::element_text(family=font,
+                                      size= base_size,
+                                      color= text_colour),
+    axis.text.x = ggplot2::element_text(margin=ggplot2::margin(r = 5, t = 6, b = 24)),
+    axis.text.y = ggplot2::element_text(margin =ggplot2::margin(t = 6, l = 6, r = 6)),
+    axis.ticks = ggplot2::element_blank(),
+    axis.line = ggplot2::element_blank(),
+
+    #Grid lines
+    #This removes all minor gridlines and adds major y gridlines. In many
+    # cases you will want to change this to remove y gridlines and add x
+    # gridlines. The cookbook shows you examples for doing so
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.grid.major.y = ggplot2::element_line(color="#cbcbcb"),
+    panel.grid.major.x = ggplot2::element_blank(),
+
+    #Blank background
+    #This sets the panel background as blank, removing the standard grey
+    # ggplot background colour from the plot
+    panel.background = ggplot2::element_blank(),
+
+    #Strip background (#This sets the panel background for facet-wrapped plots
+    # to white, removing the standard grey ggplot background colour and sets
+    #  the title size of the facet-wrap title to font size 22)
+    strip.background = ggplot2::element_rect(fill="white"),
+    strip.text = ggtext::element_textbox_simple(
+      family= font,
+      lineheight = 1.2,
+      size  = base_size * 1.125,
+      color= title_colour,
+      hjust = 0)
+  )
+}
+
+Guidelines and notes: 
+Background color: #FFFFFF
+Borders around visualisation: No
+
+
+*Text size summary*
+Title: 2 rem (24 pt), #222222
+Subtitle: 1.53 rem (18.4 pt), #525252
+Legend text: 1.3331 rem (16 pt), #525252
+Axis text: 1.3331 rem (16 pt), #525252
+Footer text: 1.1669 rem (14pt), #525252
+
+*Title*
+Font: Open Sans
+Text: 2 rem (24 points, 32 pixels)
+Lineheight: 1.35
+Space above title: 0rem
+Fontweight: Bold
+color: #222222
+
+*Subtitle*
+Font: Open Sans
+Text:  1.53 rem, (18.4 points, 24.5 pixels)
+Lineheight: 1.45
+Space from title: Custom, 1 rem (12 points)
+Fontweight: Regular
+color: #525252
+
+*Axis text*
+Font: Open Sans
+Size: 1.3331 rem (16 points, 21.33 pixels), #525252
+color: #525252
+Padding: 0.41 rem (5 pt)
+Angle: 0
+Weight: Regular
+Lineheight: 1
+
+*Gridlines (when turned on)*
+color: #CBCBCBC
+Style: Solid
+Width: 0.0419 rem (0.5 pt)
+  
+*Legend (when enabled)*
+
+- Legend title text
+Weight: Bold
+Alignment: Left
+Size:  1.3331 rem (16 pt, 21.3 px), #525252
+color: #525252
+
+- Legend text 
+Weight: Normal
+Size:  1.3331 rem (16 pt, 21.3 px), #525252
+color: #525252
+Outline: Off
+
+*Text labels (when included)*
+Size:  1.3331 rem (16 pt, 21.3 px), #525252
+Weight: Bold
+Outline: Off
+
+*Small multiple text (when included)*
+Font: Open Sans
+Size: 1.5 rem (18 points, 24 pixels), #222222
+Lineheight = 1.2
+
+*Footer*
+- Footer text
+Size: 1.1669 rem , (14 points, 18.67 pixels)
+color: #525252
+Fontweight: Regular
+Lineheight = 1.2
+
+  
+```
+
+
+## Example charts
+
+For the example charts in this cookbook, we will be using a dataset from the Global Coal Plant Tracker (GCPT) with the capacity of coal-fired power by status and by country from 2015 to 2023. So the first step would be to load the data in and turning it into a long 'tidy' data structure to be used in our plots. 
+
+
+```{r loads_coal_data, echo=FALSE}
+#This line of code installs the pacman page if you do not have it installed - if you do, it simply loads the package
+coal_data <- openxlsx::read.xlsx("https://globalenergymonitor.org/wp-content/uploads/2024/04/gcpt_jan_2024_dashboard_status_data.xlsx", sheet = "Data", sep.names = " ") |>
+  tidyr::pivot_longer(-c(Country, Year), 
+                      names_to = "Status",
+                      values_to = "CapacityGW") |>
+  dplyr::mutate(Status = stringr::str_remove(Status, 
+                                             stringr::fixed(" (GW)")))
+```
+
+### Line chart
+
+For a line chart, we can show the total operating coal-fired power capacity in the United Kingdom from 2015 as a line. We will first need to filter our data accordingly, to just data for the UK and with status operating. 
+
+```{r prepare_data_for_line_chart}
+#Prepare data for line chart
+line_chart_df <- 
+  coal_data |>
+  dplyr::filter(Country == "United Kingdom" & Status == "Operating")
+
+```
+
+``` {r create_line_chart, warning = FALSE}
+line_chart <- 
+  ggplot(line_chart_df, 
+         aes(x = Year, y = CapacityGW)) +
+  geom_line(colour = "#bf532c", linewidth = 1.25) +
+  geom_hline(yintercept = 0, linewidth = 1, colour="#333333") +
+  scale_y_continuous(expand = c(0,0)) +
+  gem_style() +
+  labs(title="The UK has retired almost all its coal power",
+       subtitle = "Operating coal-fired power capacity in the United Kingdom by year, in gigawatts (GW)")
+       
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+line_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/line_chart.png", 
+                height_pixels = 600)
+```
+
+![Line chart](example_plots/line_chart.png){width=800, height=600}
+
+### Multiple line chart
+
+For a chart with multiple lines, we can compare the total operating coal-fired power capacity in a number of European countries from 2015. We will first need to filter our data accordingly, to just data for a select number of countries and with status operating. 
+
+```{r prepare_data_for_multiple_line_chart}
+#Prepare data for chart with multiple lines
+multiple_line_chart_df <- 
+  coal_data |>
+  dplyr::filter(Country == "United Kingdom" | Country == "France" | Country == "Italy") |>
+  dplyr::filter(Status == "Operating")
+
+```
+
+``` {r create_multiple_line_chart, warning=FALSE}
+multiple_line_chart <- 
+  ggplot(multiple_line_chart_df, 
+         aes(x = Year, y = CapacityGW, group = Country, colour = Country)) +
+  geom_line(linewidth = 1.25) +
+  geom_hline(yintercept = 0, linewidth = 1, colour="#333333") +
+  scale_colour_manual(values = c("#bf532c", "#f27d16", "#4f408c")) +
+  scale_y_continuous(expand = c(0,0)) +
+  gem_style() +
+  labs(title="Italy, France and the UK have reduced their coal power capacity",
+       subtitle = "Operating coal-fired power capacity in selected countries by year, in gigawatts (GW)")
+       
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+multiple_line_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart](example_plots/multiple_line_chart.png){width=800, height=600}
+
+### Bar chart (horizontal bars)
+
+For our bar chart, we want to show the top 10 countries outside China for coal power capacity, so we need to filter the data from our main dataset accordingly, which the code below does.  
+
+```{r prepare_data_for_bar_chart}
+#Prepare data for bar chart
+bar_chart_df <- coal_data |>
+  dplyr::filter(Country != "Global", 
+                Country != "G20",
+                Country != "G7",
+                Country != "OECD",
+                Country != "EU27",
+                Country != "China") |>
+  dplyr::filter(Year == 2023 & Status == "Operating") |>
+  dplyr::arrange(desc(CapacityGW)) |>
+  dplyr::top_n(10, CapacityGW)
+
+```
+
+
+
+``` {r bar_chart_code}
+
+bar_chart <- 
+  ggplot(data = bar_chart_df, 
+         aes(x = CapacityGW,
+             y = reorder(Country, CapacityGW))) +
+  geom_bar(stat = "identity", 
+           fill = "#bf532c") +
+  geom_vline(xintercept = 0, linewidth = 1, colour="#333333") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  gem_style() +
+  theme(panel.grid.major.x = element_line(color="#cbcbcb"),
+        panel.grid.major.y=element_blank()) +
+  labs(title = "India and the US with most coal power capacity outside China",
+       subtitle = "Coal-fired power capacity outside China by country, in gigawatts (GW)")
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+bar_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart.png", 
+                height_pixels = 600)
+```
+
+![Bar chart](example_plots/bar_chart.png){width=800, height=600}
+
+### Stacked bar chart (horizontal bars)
+
+For our stacked bar chart, we want to show the top 10 countries outside China for coal power including operating and under construction, so we need to filter the data from our main dataset accordingly, which the code below does.  
+
+```{r prepare_data_for_stacked_bar_chart}
+#Prepare data for bar chart
+countries_to_plot <- 
+  coal_data |>
+  dplyr::filter(Country != "Global", 
+                Country != "G20",
+                Country != "G7",
+                Country != "OECD",
+                Country != "EU27",
+                Country != "China") |>
+  dplyr::filter(Status == "Operating" | Status == "Construction") |>
+  dplyr::filter(Year == 2023) |>
+  dplyr::group_by(Country) |>
+  dplyr::summarise(CapacityGW = sum(CapacityGW)) |>
+  dplyr::arrange(desc(CapacityGW)) |>
+  dplyr::top_n(10, CapacityGW) |>
+  dplyr::pull(Country)
+
+stacked_bar_chart_df <- coal_data |>
+  dplyr::filter(Status == "Operating" | Status == "Construction") |>
+  dplyr::filter(Year == 2023) |>
+  dplyr::filter(Country %in% countries_to_plot) 
+
+#set order of stacks by changing factor levels
+stacked_bar_df_ordered <- stacked_bar_chart_df |>
+  mutate(Status = factor(Status, levels = c("Construction", "Operating")))
+
+
+```
+
+
+
+``` {r stacked_bar_chart_code}
+
+stacked_bar_chart <- 
+  ggplot(data = stacked_bar_df_ordered, 
+         aes(x = CapacityGW,
+             y = reorder(Country, CapacityGW),
+             group = Status,
+             fill = Status)) +
+  geom_bar(stat = "identity",
+           position = "stack") +
+  geom_vline(xintercept = 0, linewidth = 1, colour="#333333") +
+  scale_fill_manual(values = c( "#f27d16", "#bf532c")) +
+  # in this case, we have specifically defined our limits and breaks - we don't need to do that like so, but if we know we are not updating the data here, it helps us control exactly which breaks we want to appear on the x-axis.
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  gem_style() +
+  theme(panel.grid.major.x = element_line(color="#cbcbcb"),
+        panel.grid.major.y=element_blank()) +
+  guides(fill = guide_legend(reverse=T)) +
+  labs(title = "Only a few countries are adding more coal power capacity",
+       subtitle = "Coal-fired power capacity in the 10 countries outside China with most capacity in operation and under construction, in gigawatts (GW)")
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+stacked_bar_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 700) |>
+  save_gem_plot(save_filepath = "example_plots/stacked_bar_chart.png", 
+                height_pixels = 700)
+```
+
+![Bar chart](example_plots/stacked_bar_chart.png){width=800, height=700}
+
+
+### Column chart (vertical bar chart)
+
+First we prepare the data for the bar chart, in this case we will filter the data from our main dataset to include the total operating capacity globally, so that we can plot that. 
+
+```{r prepare_data_for_column_chart}
+#Prepare data
+column_chart_df <- coal_data |>
+  dplyr::filter(Country == "Global" & Status == "Operating") |>
+  dplyr::arrange(Year) 
+
+```
+
+
+
+```{r column_chart_code}
+
+#Make column chart 
+column_chart <- ggplot(column_chart_df, 
+                    aes(x = Year, y = CapacityGW)) +
+  geom_bar(stat="identity", 
+           position="identity", 
+           fill= "#bf532c") +
+  geom_hline(yintercept = 0, linewidth = 1, colour="#333333") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  gem_style() +
+  labs(title="The world's coal capacity has risen every year since 2015",
+       subtitle = "Operating coal-fired power capacity globally, 2015-2023")
+
+
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+column_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/column_chart.png", 
+                height_pixels = 600)
+```
+
+![Column chart](example_plots/column_chart.png){width=800, height=600}
+
+### Stacked column chart
+
+Again we need to prepare the data for the stacked bar chart, in this case we will filter the data from our main dataset to include rows for China with coal under development only, so rows where the status is either permitted, pre-permit and announced. 
+
+```{r prepare_data_for_proportional_stacked_column_chart}
+#prepare data
+stacked_column_df <- coal_data |> 
+  filter(Country == "China" & Status %in% c("Permitted",
+                                           "Pre-permit", 
+                                           "Announced"))
+
+#set order of stacks by changing factor levels
+stacked_column_df_ordered <- stacked_column_df |>
+  mutate(Status = factor(Status, levels = c("Permitted", 
+                                            "Pre-permit",
+                                            "Announced")))
+  
+```
+
+``` {r proportional_stacked_column_chart_code}
+#create plot
+stacked_column_chart_proportion <- ggplot(data = stacked_column_df_ordered, 
+                       aes(x = Year,
+                           y = CapacityGW,
+                           fill = Status)) +
+  geom_bar(stat = "identity", 
+           position = "fill") +
+  gem_style() +
+  scale_x_continuous(expand = c(0,0)) +
+
+  scale_y_continuous(expand = c(0,0),
+                     labels = scales::percent) +
+  scale_fill_manual( values = c("#AB4300", "#F27D16", "#F2C094")) +
+  geom_hline(yintercept = 0, linewidth = 1, colour = "#333333") +
+  labs(title = "Share of coal capacity permitted grows",
+       subtitle = "Percentage of coal capacity under development by status") +
+  theme(legend.position = "top", 
+        legend.justification = "left") 
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+stacked_column_chart_proportion |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/stacked_column_chart_proportion.png", 
+                height_pixels = 600)
+```
+
+![Stacked column chart proportional](example_plots/stacked_column_chart_proportion.png){width=800, height=600}
+
+This example shows proportions, but you might want to make a stacked bar chart showing number values instead - this is easy to change!
+
+The value passed to the `position` argument will determine if your stacked chart shows proportions or actual values. 
+
+`position = "fill"` will draw your stacks as proportions, and `position = "identity"` will draw number values.
+
+``` {r stacked_column_chart_code}
+
+stacked_column_chart <- ggplot(data = stacked_column_df_ordered, 
+                       aes(x = Year,
+                           y = CapacityGW,
+                           fill = Status)) +
+  geom_bar(stat = "identity", 
+           position = "identity") +
+  gem_style() +
+  scale_fill_manual( values = c("#AB4300", "#F27D16", "#F2C094")) +
+  geom_hline(yintercept = 0, linewidth = 1, colour = "#333333") +
+  labs(title = "Coal power capacity under development increases every year from 2018",
+       subtitle = "Coal capacity under development by status, in gigawatts (GW)") +
+  theme(legend.position = "top", 
+        legend.justification = "left") 
+
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+stacked_column_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/stacked_column_chart.png", 
+                height_pixels = 600)
+```
+
+![Stacked column chart](example_plots/stacked_column_chart.png){width=800, height=600}
+
+
+## Style your charts
+
+### Adjust the gridlines
+
+#### Add or remove major gridlines
+
+The default `gemplot` theme has gridlines for the y axis only by default. This makes sense for line charts or column charts (vertical bar charts) but not for bar charts (horizontal) or some other type of visuals. You can add x gridlines with panel.grid.major.x = element_line below. In some cases, for example treemaps, you wouldn't want any gridlines at all so you can remove the gridlines on the y axis with panel.grid.major.y=element_blank())
+
+
+``` {r bar_chart_with_x_gridlines}
+bar_chart_with_x_gridlines <- 
+  bar_chart +
+  theme(panel.grid.major.x = element_line(color="#cbcbcb"),
+        panel.grid.major.y=element_blank())
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+bar_chart_with_x_gridlines |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_with_x_gridlines.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with x gridlines](example_plots/bar_chart_with_x_gridlines.png){width=800, height=600}
+
+``` {r bar_chart_with_y_gridlines}
+bar_chart_with_y_gridlines <- 
+  bar_chart +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.major.y= element_line(color="#cbcbcb"))
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+bar_chart_with_y_gridlines |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_with_y_gridlines.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with y gridlines](example_plots/bar_chart_with_y_gridlines.png){width=800, height=600}
+
+``` {r bar_chart_with_no_gridlines}
+bar_chart_no_gridlines <-
+  bar_chart +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.major.y= element_blank())
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+bar_chart_no_gridlines |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_with_no_gridlines.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with no gridlines](example_plots/bar_chart_with_no_gridlines.png){width=800, height=600}  
+
+#### Add minor gridlines
+
+As a default, `gemplot` only displays 'major' gridlines, which are the gridlines which have data breaks and axis labels. However, we can also show minor gridlines, which at times may help the audience get more of a sense of the breaks, without having to label each break and are less prominent than our standard gridlines. To do this, we just have to add the `panel.grid.minor.y` argument to our `theme` function.  
+
+In the code block below, we have both major ad minor x gridlines, but we define the linewidth for the minor gridlines to be 0.1 (the default size for major gridlines is 0.25), as we want them to be less prominent than the major gridlines. In the same way as the general/major axis breaks, we can also define the minor axis breaks ourselves using the argument `minor_breaks = ` in our scale function - but you will see below that ggplot has automatically set the minor breaks between the major breaks (every 25 GW, with majr breaks every 50 GW) so it all makes sense without us having to make any specific declarations. 
+
+```{r bar_chart_with_minor_gridlines}
+bar_chart_with_minor_gridlines <- 
+  bar_chart +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.major.x= element_line(color="#cbcbcb"),
+        panel.grid.minor.x = element_line(colour="#cbcbcb", linewidth = 0.15))
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+bar_chart_with_minor_gridlines |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_with_minor_gridlines.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with minor gridlines](example_plots/bar_chart_with_minor_gridlines.png){width=800, height=600}  
+
+### Modify your axis
+
+Depending on what type of chart you want, you will likely want to make changes to your axis. You have the flexibility in ggplot to make a whole host of tweaks ranging from the start and end point of your axis, the axis breaks, labels etc. 
+
+R and ggplot makes some loogical decisions about your axis limits, so where your axis should start and end. A lot of the time this may be completely fine, but other times you may want to modofiy this to have some control over the process. Of course this should all happen based on good dataviz guidelines and principles - so make sure you are start a bar or column chart from 0 - but use the code below to change your limits. 
+
+#### Adjust axis limits
+
+Take the bar chart we have made - say we want to extent the limits of the x-axis beyond what ggplot has automatically drawn and go beyond 250. This is especially useful at times to give us some space to label for example (this can be done in combination with margin adjustments, covered below). We will do this using a `scale` function. As this is for the x-axis, and it is a continuous variable that we want to change, the function here is `scale_x_continuous()`. You can find further [scale functions in the ggplot2 reference guide](https://ggplot2.tidyverse.org/reference/#scales). 
+
+The arguments to set the axis limits are `limits = c(start, end)` - so here is how it looks if we want to extend our x-axis to 270 for example. 
+
+``` {r bar_chart_axis_limits, message = FALSE}
+bar_chart_axis_limits <-
+  bar_chart +
+  scale_x_continuous(expand = c(0,0),
+                     limits = c(0, 270))
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_axis_limits |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_axis_limits.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with x-axis limits adjusted](example_plots/bar_chart_axis_limits.png){width=800, height=600}
+
+#### Adjust axis breaks
+
+In the same way, you may want to set your axis breaks differently to how ggplot has automatically arranged them. There are a number of ways to do this - you can set it manually or programatically for example. For example, with our bar chart above say we want to have breaks every 25 GW instead of every 50 GW. What we have to do here is add a breaks argument within our scale function - here is how we would do this, manually first. 
+
+``` {r bar_chart_axis_breaks_manual, message = FALSE}
+ bar_chart_axis_breaks_manual <-
+  bar_chart +
+  scale_x_continuous(expand = c(0,0),
+                     limits = c(0, 270),
+                     breaks = c(0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250))
+
+```
+
+Here is the code to do this programmatically using the `seq` function within the breaks argument in our scale function. This process is definitely encouraged, as it is easier to replicate for other examples, saves typing and scales better for multiple graphics. 
+
+
+``` {r bar_chart_axis_breaks_auto, message = FALSE}
+ bar_chart_axis_breaks_auto <-
+  bar_chart +
+  scale_x_continuous(expand = c(0,0),
+                     limits = c(0, 270),
+                     breaks = seq(0, 270, by = 25))
+
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_axis_breaks_auto |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_axis_breaks.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with x-axis labels adjusted](example_plots/bar_chart_axis_breaks.png){width=800, height=600}
+There is a wide range of different axis scales we can use for our charts, and there are a number of different scale functions to work with each of them. For example, if your x-axis data consists of dates, you can use `scale_x_date()` and as it recognises dates, it provides you functionality to set axis breaks by weeks, months, or years with much more flexibility than setting it manually, as well as setting your axis text in the format you want. 
+
+Check out all the [references and examples for how to use scale_x_date in the ggplot2 reference guide](https://ggplot2.tidyverse.org/reference/scale_date.html) - but bear in mind you will probably need to understand a little bit about date formats in R beforehand.  
+
+#### Axis break texts  
+
+In the same way that you can change the axis breaks as we have done above manually, you can use strings as text instead of numbers. For example, if we want to add the word `gigawatts` to one of the axis breaks, you can do so manually for example by specifying that in the `labels` argument. 
+
+``` {r bar_chart_axis_breaks_text, message = FALSE}
+ bar_chart_axis_breaks_with_text <-
+  bar_chart +
+  scale_x_continuous(expand = c(0,0),
+                     limits = c(0, 270),
+                     labels = c("0 gigawatts", "50", "100", "150", "200", "250"))
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_axis_breaks_with_text |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_axis_breaks_text.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with axis breaks text](example_plots/bar_chart_axis_breaks_text.png){width=800, height=600}
+You can also use a the `label_number` function from the `scales` packages for example to add a prefix or a suffix to your axis labels, for exampole if we wanted to have `GW` after each of your axis labels. 
+
+
+``` {r bar_chart_axis_breaks_suffix, message = FALSE}
+ bar_chart_axis_breaks_with_suffix <-
+  bar_chart +
+  scale_x_continuous(expand = c(0,0),
+                     limits = c(0, 270),
+                     labels = scales::label_number(suffix = " GW"))
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_axis_breaks_with_suffix |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_axis_suffix.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with axis breaks text](example_plots/bar_chart_axis_suffix.png){width=800, height=600}  
+There are also plenty of options within the `scales` package to also help with this. For example, there are functions to add commas for thousand separators - see below for how we add it to the y-axis of the column chart.
+
+
+``` {r column_chart_thousand_separator, message = FALSE}
+ column_chart_thousand_separator <-
+  column_chart +
+  scale_y_continuous(expand = c(0,0),
+                     labels = scales::comma)
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+column_chart_thousand_separator |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/column_chart_thousand_separator.png", 
+                height_pixels = 600)
+```
+
+![Column chart with thousand separator](example_plots/column_chart_thousand_separator.png){width=800, height=600}  
+There are other ways to do this, like using the `format` and the `paste` functions, but the `scales` package offers some formatting options like comma, dollar, percent and more. 
+
+#### Add axis titles
+
+Our default theme has no axis titles, as most of the time your title, subtitle and labelling should cover all the bases and you shouldn't need an axis title, it will be redundant. However, if you do wish to add an axis title, and there may be some cases where they are important, for example in scatterplots, you can add them in manually via theme modifications.. This is done by modifying `theme()` - note that you must do this after the call to `gem_style()` or your changes will be overridden. Just adding in axis titles, the default will be to show the column names in your dataset as your axis title and as you should see below, this isn't always ideal - see the code block below about how to set the axis titles manually yourself. 
+
+``` {r bar_chart_with_axis_title}
+
+bar_chart_with_axis_title <- 
+  bar_chart + 
+  theme(axis.title = element_text(size = 18, 
+                                  family="Open Sans",
+                                  colour = "#525252"))  
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_with_axis_title |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_axis_title.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with an x-axis title ](example_plots/bar_chart_axis_title.png){width=800, height=600}  
+
+#### Modify axis titles
+
+If you add in axis titles, they will by default be the column names in your dataset - as you can see above, this isn't always ideal. You can change this to anything you want in your call to labs().
+
+For instance, if you wish your x axis title to be “I’m an axis” and your y axis label to be blank, this would be the format:
+
+
+``` {r bar_chart_with_bespoke_axis_title}
+
+bar_chart_with_bespoke_axis_title <- 
+  bar_chart + 
+  theme(axis.title = element_text(size = 18,
+                                  family="Open Sans",
+                                  colour = "#525252")) +
+  labs(x = "I'm an axis title", 
+       y = "")  
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_with_bespoke_axis_title |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_bespoke_axis_title.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with an x-axis title ](example_plots/bar_chart_bespoke_axis_title.png){width=800, height=600}       
+
+#### Add axis ticks
+
+You can add axis tick marks by adding `axis.ticks.x` or `axis.ticks.y` to your theme - take this example with out multi-line chart. 
+
+``` {r multiple_line_chart_with_axis_breaks}
+
+multiple_line_chart_with_axis_ticks <- 
+  multiple_line_chart + 
+  theme(axis.ticks.x = element_line(colour = "#333333"), 
+  axis.ticks.length =  unit(0.26, "cm"))
+
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_with_axis_ticks |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_with_axis_ticks.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with x-axis ticks](example_plots/multiple_line_chart_with_axis_ticks.png){width=800, height=600}  
+
+### Make changes to your legend
+
+#### Remove the legend
+
+Remember, remove the legend to become one - it's better to label data directly with text annotations, so it's likely that you will want to remove the legend from your plot. Yo
+
+You can also remove all legends in one go using `theme(legend.position = "none")`:
+
+```{r remove_legend_theme}
+multiple_line_chart_no_legend_theme <- 
+  multiple_line_chart + 
+  theme(legend.position = "none")
+
+```
+
+Or you can use `guides(colour=FALSE)` to remove the legend for a specific aesthetic (replace `fill` with the relevant aesthetic). 
+
+```{r remove_legend_guides, message = FALSE}
+multiple_line_chart_no_legend_guides <- 
+  multiple_line_chart + 
+  guides(fill= "none")
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_no_legend_theme |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_no_legend.png", 
+                height_pixels = 600)
+```
+
+![Multiple line no legend](example_plots/multiple_line_no_legend.png){width=800, height=600}  
+
+#### Change the position of the legend
+
+The legend's default position is at the top of your plot. Move it to the left, right or bottom outside the plot with:
+
+```{r multiple_line_legend_position}
+multiple_line_legend_right <- 
+  multiple_line_chart +
+  theme(legend.position = "right")
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_legend_right |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_legend_right.png", 
+                height_pixels = 600)
+```
+
+![Multiple line legend on the right](example_plots/multiple_line_legend_right.png){width=800, height=600}  
+
+To be really precise about where we want our legend to go, instead of specifying "right" or "top" to change the general position of where the legend appears in our chart, we can give it specific coordinates. 
+
+For example `legend.position=c(0.98,0.1)` will move the legend to the bottom right. For reference, c(0,0) is bottom left, c(1,0) is bottom right, c(0,1) is top left and so on). Finding the exact position may involve some trial and error. 
+
+To check the exact position where the legend appears in your finalised plot you will have to check when the file is saved out and not via the preview. You will also see here that when we choose to directly position our legend, it doesn;t automatically get a slot below the subtitle, so we have to add extra subtitle space, so that you can position it outside of the plot and not taking up any space, you will need to give your subtitle some margin below. 
+
+```{r multiple_line_}
+  multiple_line_chart_direct_legend <-
+  multiple_line_chart + 
+  theme(legend.position = c(0.165, 1.02),
+        legend.direction = "horizontal") 
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_direct_legend |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_direct_legend.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with directly placed legend](example_plots/multiple_line_chart_direct_legend.png){width=800, height=600}  
+
+
+#### Legend title
+
+Remove the legend title by tweaking your `theme()`. Don't forget that for any changes to the theme to work, they must be added after you've called `gem _style()`!
+
+```{r multiple_line_legend_title }
+multiple_line_chart_legend_title <- 
+  multiple_line_chart +
+  theme(legend.title = element_text(size = 18, 
+                                  family="Open Sans",
+                                  colour = "#525252")) 
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_legend_title |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_legend_title.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with directly placed legend](example_plots/multiple_line_chart_legend_title.png){width=800, height=600}  
+
+#### Reverse the order of your legend
+
+Sometimes you need to change the order of your legend for it to match the order of your bars. For this, you need `guides`:
+
+```{r multiple_line_chart_legend_reversed}
+multiple_line_chart_legend_reversed <- 
+  multiple_line_chart +
+  guides(colour = guide_legend(reverse = TRUE))
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_legend_reversed |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_legend_reversed.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with directly placed legend](example_plots/multiple_line_chart_legend_reversed.png){width=800, height=600}  
+
+#### Rearrange the layout of your legend
+
+If you've got many values in your legend, you may need to rearrange the layout for aesthetic reasons. 
+
+You can specify the number of rows you want your legend to have as an argument to `guides`. The below code snippet, for instance, will create a legend with 3 rows (you could also do this by changing legend direction in this case, but not always). You may need to change `colour` in the code above to whatever aesthetic your legend is describing, e.g. `size`, `fill`, etc.
+
+```{r multiple_line_chart_legend_rearranged}
+multiple_line_chart_legend_rearranged <- 
+  multiple_line_chart +
+  guides(colour = guide_legend(nrow = 3, byrow = T))
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_legend_rearranged |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_legend_rearranged.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with re-arranged legend](example_plots/multiple_line_chart_legend_rearranged.png){width=800, height=600}  
+
+#### Change the appearance of your legend symbols
+
+You can override the default appearance of the legend symbols, without changing the way they appear in the plot, by adding the argument `override.aes` to `guides`. 
+
+The below will make the size of the legend symbols larger, for instance:
+
+```{r multiple_line_chart_legend_symbols}
+multiple_line_chart_legend_symbols <- 
+  multiple_line_chart +
+  guides(colour = guide_legend(override.aes = list(size = 20)))
+```
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_legend_symbols |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_legend_symbols.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with differently sized legend symbols](example_plots/multiple_line_chart_legend_symbols.png){width=800, height=600}  
+
+#### Add space between your legend labels
+
+The default ggplot legend has almost no space between individual legend items. Not ideal.
+
+You can add space by changing the scale labels manually. 
+
+For instance, if you have set the colour of your geoms to be dependent on your data, you will get a legend for the colour, and you can tweak the exact labels to get some extra space in by using the below snippet:
+
+```{r multiple_line_chart_space_label, message = FALSE}
+multiple_line_chart_space_label <- 
+  multiple_line_chart +
+  scale_colour_manual(values = c("#bf532c", "#f27d16", "#4f408c"),
+                      labels = function(x) paste0(" ", x, "  "))
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+multiple_line_chart_space_label |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_space_label.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with space between legend items](example_plots/multiple_line_chart_space_label.png){width=800, height=600}  
+
+If your legend is showing something different, you will need to change the code accordingly. For instance, for fill, you will need `scale_fill_manual()` instead. 
+
+
+### Colour data conditionally 
+
+You can set aesthetic values like the `fill`, `alpha` (opacity), and size conditionally by using an `ifelse()` statement.
+
+The syntax is `fill = ifelse(logical_condition, fill_if_true, fill_if_false)`.
+
+Below is a code block example where we are specifying the colour for a specific bar in our bar chart - say Indonesia. 
+
+``` {r bar_chart_colour_conditionally}
+bar_chart_colour_conditionally <- 
+  bar_chart + 
+  geom_bar(stat="identity", 
+           position="identity",
+           fill=ifelse(bar_chart_df$Country == "Indonesia", "#bf532c", "#f27d16")) +
+  geom_vline(xintercept = 0, linewidth = 1, colour="#333333")
+
+```
+
+
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_colour_conditionally |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_colour_conditionally.png", 
+                height_pixels = 600)
+```
+
+![Bar chart colour conditionally](example_plots/bar_chart_colour_conditionally.png){width=800, height=600}
+
+We could do this by specifying something other than a country name, to make it conditional on the data, so any country under 30 GW for example. 
+
+
+``` {r bar_chart_colour_conditionally_v2}
+bar_chart_colour_conditionally_v2 <- 
+  bar_chart + 
+  geom_bar(stat="identity", 
+           position="identity",
+           fill=ifelse(bar_chart_df$CapacityGW >= 30, "#bf532c", "#f27d16")) +
+  geom_vline(xintercept = 0, linewidth = 1, colour="#333333")
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE, message = FALSE}
+bar_chart_colour_conditionally_v2 |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_colour_conditionally_v2.png", 
+                height_pixels = 600)
+```
+
+![Bar chart colour conditionally version 2](example_plots/bar_chart_colour_conditionally_v2.png){width=800, height=600}
+
+### Add data labels to your chart
+
+``` {r bar_chart_with_data_labels}
+labelled_bar_chart <- 
+  bar_chart +
+  geom_label(aes(x = CapacityGW, y =  Country, label = round(CapacityGW, 0)),
+             hjust = 1, 
+             vjust = 0.5, 
+             colour = "white", 
+             fill = NA, 
+             label.size = NA, 
+             family="Open Sans", 
+             fontface = "bold",
+             size = 6)
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+labelled_bar_chart |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_with_labels.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with data labels](example_plots/bar_chart_with_labels.png){width=800, height=600}  
+
+And as in the example above of colouring our data conditionally, we can do the same with our labels as well by using an ifelse statement. 
+
+
+``` {r bar_chart_with_data_labels_conditional}
+labelled_bar_chart_conditional <- 
+  bar_chart +
+  geom_label(aes(x = CapacityGW, 
+                 y =  Country,
+                 label = round(CapacityGW, 0)),
+             hjust = 1, 
+             vjust = 0.5, 
+             colour = ifelse(bar_chart_df$CapacityGW > 50, "white", "black"), 
+             fill = NA, 
+             label.size = NA, 
+             family="Open Sans", 
+             fontface = "bold",
+             size = 6)
+
+```
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+labelled_bar_chart_conditional |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/bar_chart_with_labels_conditional.png", 
+                height_pixels = 600)
+```
+
+![Bar chart with data labels conditional on data value](example_plots/bar_chart_with_labels_conditional.png){width=800, height=600}  
+
+### Annotate your chart
+
+#### Basic annotation  
+
+Your can make your chart cleaner and to really tell a story by adding annotations to it, especially to highlight key and important points. In ggplot, you do this by directly positioning your text on your chart based on the coordinates of your data, as you can see below. We are placing our annotation with the x at 2020, so based on the x-axis which is made up of years, at year 2020, and y = 14, so 14 gigawatts.  
+
+``` {r multiple_line_chart_with_annotation}
+multiple_line_chart_with_annotation <- 
+  multiple_line_chart + 
+  geom_label(aes(x = 2020, y = 14, label = "I'm an annotation!"), 
+             hjust = 0.5, 
+             vjust = 0.5, 
+             colour = "#555555",
+             fill = "white",
+             label.size = NA, 
+             family="Open Sans",
+             size = 6)
+                           
+```                           
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+multiple_line_chart_with_annotation |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_with_annotation.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with annotation](example_plots/multiple_line_chart_with_annotation.png){width=800, height=600}  
+
+#### Annotation with line
+
+It's often much clearer to use a line to point to exactly the data point on your chart you want to highlight - we can do it here using the `geom_segment()` function.
+
+``` {r multiple_line_chart_with_annotation_and_line}
+multiple_line_chart_with_annotation_and_line <- 
+  multiple_line_chart_with_annotation + 
+  geom_segment(aes(x = 2020, y = 7.75, xend = 2020, yend = 13), 
+                             colour = "#555555", 
+                             linewidth = 0.5)
+
+                           
+```                           
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+multiple_line_chart_with_annotation_and_line |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_with_annotation_and_line.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with annotation and line](example_plots/multiple_line_chart_with_annotation_and_line.png){width=800, height=600}  
+
+#### Annotation with curved line  
+
+For a curved line, use geom_curve instead of geom_segment. The code block below sets curvature at 0.2, but you can play around with this to get the curve that you want - having a negative value, say -0.2, will mean the curve goes round the other way, you will just have some trial and error and practice to understand how it works. 
+
+``` {r multiple_line_chart_with_annotation_and_curved_line}
+multiple_line_chart_with_annotation_and_curved_line <- 
+  multiple_line_chart + 
+   geom_label(aes(x = 2022, y = 14, label = "I'm an annotation!"), 
+             hjust = 0.5, 
+             vjust = 0.5, 
+             colour = "#555555",
+             fill = "white",
+             label.size = NA, 
+             family="Open Sans",
+             size = 6) +
+  geom_curve(aes(x = 2022, y = 13, xend = 2020, yend = 7.75), 
+             colour = "#555555", 
+             curvature = 0.2,
+             linewidth = 0.5)
+
+                           
+```                           
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+multiple_line_chart_with_annotation_and_curved_line |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_with_annotation_and_curved_line.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with annotation and curved line](example_plots/multiple_line_chart_with_annotation_and_curved_line.png){width=800, height=600}  
+  
+#### Annotation with curved arrow  
+
+In order to add an arrowhead to your curved line, to make it a curved arrow, you need to add the arrow argument to your geom_curve function, and play around with the length and type of arrow you want. 
+                             
+
+``` {r multiple_line_chart_with_annotation_and_curved_arrow}
+multiple_line_chart_with_annotation_and_curved_arrow <- 
+  multiple_line_chart + 
+   geom_label(aes(x = 2022, y = 14, label = "I'm an annotation!"), 
+             hjust = 0.5, 
+             vjust = 0.5, 
+             colour = "#555555",
+             fill = "white",
+             label.size = NA, 
+             family="Open Sans",
+             size = 6) +
+  geom_curve(aes(x = 2022, y = 13, xend = 2020, yend = 7.75), 
+             colour = "#555555", 
+             curvature = 0.2,
+             linewidth = 0.5, 
+             arrow = arrow(length = unit(0.03, "npc")))
+
+                           
+```                           
+
+```{r echo=FALSE, output = FALSE, warning=FALSE}
+multiple_line_chart_with_annotation_and_curved_arrow |>
+  add_gem_footer(source_name = "Source: Global Coal Plant Tracker, Global Energy Monitor",
+                 height_pixels = 600) |>
+  save_gem_plot(save_filepath = "example_plots/multiple_line_chart_with_annotation_and_curved_arrow.png", 
+                height_pixels = 600)
+```
+
+![Multiple line chart with annotation and curved arrow](example_plots/multiple_line_chart_with_annotation_and_curved_arrow.png){width=800, height=600}  
